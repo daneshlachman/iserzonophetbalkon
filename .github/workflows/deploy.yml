@@ -27,7 +27,9 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}:latest
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
 
       - name: Azure Login
         uses: azure/login@v2
@@ -47,4 +49,4 @@ jobs:
           az containerapp update \
             --name westerdokzon \
             --resource-group Tools-Danesh \
-            --image ghcr.io/${{ github.repository }}:latest
+            --image ghcr.io/${{ github.repository }}:${{ github.sha }}
