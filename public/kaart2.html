@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <title>Huidig model — Westerdoksdijk 251b</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, sans-serif; display: flex; height: 100vh; }
+    #map { flex: 1; }
+    #panel {
+      width: 280px; background: #1a1a1a; color: #e8e8e8;
+      padding: 16px; overflow-y: auto; font-size: 13px;
+    }
+    h2 { font-size: 14px; color: #f9a825; margin-bottom: 12px; }
+    .bld {
+      background: #2a2a2a; border-radius: 8px;
+      padding: 10px 12px; margin-bottom: 8px;
+      border-left: 4px solid #555;
+    }
+    .bld-name { font-weight: 700; margin-bottom: 4px; }
+    .bld-detail { color: #888; font-size: 11px; line-height: 1.6; font-family: monospace; }
+    .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+<div id="panel">
+  <h2>📍 Huidig model</h2>
+  <p style="color:#666;font-size:11px;margin-bottom:12px;">Westerdoksdijk 251b — alle punten die door de app worden gebruikt</p>
+
+  <div class="bld" style="border-color:#e74c3c">
+    <div class="bld-name"><span class="dot" style="background:#e74c3c"></span>Balkon</div>
+    <div class="bld-detail">
+      lat: 52.38480883<br>
+      lng: 4.89250117<br>
+      hoogte: 7m (2e verdieping)
+    </div>
+  </div>
+
+  <div class="bld" style="border-color:#e67e22">
+    <div class="bld-name"><span class="dot" style="background:#e67e22"></span>Gebouw links (34.3m)</div>
+    <div class="bld-detail">
+      A: 52.38461728, 4.89243592<br>
+      B: 52.38462874, 4.89215955<br>
+      az 192°–229° · 22m · dak 51.5°
+    </div>
+  </div>
+
+  <div class="bld" style="border-color:#27ae60">
+    <div class="bld-name"><span class="dot" style="background:#27ae60"></span>Gebouw voor ons (34.3m)</div>
+    <div class="bld-detail">
+      A: 52.38468277, 4.89197977<br>
+      B: 52.38486449, 4.89199855<br>
+      az 248°–280° · 34m · dak 38.5°
+    </div>
+  </div>
+
+  <div class="bld" style="border-color:#7f8c8d">
+    <div class="bld-name"><span class="dot" style="background:#7f8c8d"></span>Overkoepeling (10m)</div>
+    <div class="bld-detail">
+      A: 52.38485958, 4.89178389<br>
+      B: 52.38498727, 4.89180804<br>
+      az 275°–293° · 49m · dak 3.5°
+    </div>
+  </div>
+
+  <div class="bld" style="border-color:#2980b9">
+    <div class="bld-name"><span class="dot" style="background:#2980b9"></span>Gebouw rechtsschuin (37m)</div>
+    <div class="bld-detail">
+      A: 52.38494974, 4.89222586<br>
+      B: 52.38498573, 4.89168942<br>
+      az 290°–310° · 24m · dak 51°
+    </div>
+  </div>
+
+  <p style="color:#444;font-size:11px;margin-top:12px;">Klik op een punt of lijn voor details</p>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const balkon = [52.38480883, 4.89250117];
+const map = L.map('map').setView(balkon, 19);
+
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 21, attribution: 'Esri Satellite', opacity: 0.85
+}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 21, attribution: '© OSM', opacity: 0.25
+}).addTo(map);
+
+const buildings = [
+  {
+    name: 'Gebouw links', height: 34.3, color: '#e67e22',
+    az: '192°–229°', dist: '22m', elev: '51.5°',
+    A: [52.38461728, 4.89243592],
+    B: [52.38462874, 4.89215955],
+  },
+  {
+    name: 'Gebouw voor ons', height: 34.3, color: '#27ae60',
+    az: '248°–280°', dist: '34m', elev: '38.5°',
+    A: [52.38468277, 4.89197977],
+    B: [52.38486449, 4.89199855],
+  },
+  {
+    name: 'Overkoepeling', height: 10.0, color: '#7f8c8d',
+    az: '275°–293°', dist: '49m', elev: '3.5°',
+    A: [52.38485958, 4.89178389],
+    B: [52.38498727, 4.89180804],
+  },
+  {
+    name: 'Gebouw rechtsschuin', height: 37.0, color: '#2980b9',
+    az: '290°–310°', dist: '24m', elev: '51°',
+    A: [52.38494974, 4.89222586],
+    B: [52.38498573, 4.89168942],
+  },
+];
+
+// Balkon
+L.circleMarker(balkon, {
+  radius: 11, color: '#e74c3c', fillColor: '#e74c3c', fillOpacity: 1, weight: 3
+}).addTo(map).bindPopup('<b>🏠 Jouw balkon</b><br>2e verdieping, 7m hoog<br>' + balkon[0] + ', ' + balkon[1]);
+
+// Gebouwen
+buildings.forEach(b => {
+  // Gevel lijn
+  L.polyline([b.A, b.B], { color: b.color, weight: 6, opacity: 0.9 })
+    .addTo(map)
+    .bindPopup(`<b>${b.name}</b> — ${b.height}m<br>Azimuth: ${b.az}<br>Afstand: ${b.dist}<br>Dakhoek: ${b.elev}`);
+
+  // Lijn van balkon naar hoek A (afstandsindicatie)
+  L.polyline([balkon, b.A], { color: b.color, weight: 1, dashArray: '5,6', opacity: 0.3 }).addTo(map);
+
+  // Hoekpunten
+  [b.A, b.B].forEach((pt, i) => {
+    L.circleMarker(pt, {
+      radius: 6, color: b.color, fillColor: b.color, fillOpacity: 0.9, weight: 2
+    }).addTo(map).bindPopup(`<b>${b.name}</b><br>Hoek ${i === 0 ? 'A' : 'B'}<br>${pt[0].toFixed(8)}, ${pt[1].toFixed(8)}`);
+  });
+});
+</script>
+</body>
+</html>

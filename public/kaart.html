@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <title>Coördinaten tool — Westerdoksdijk</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; display: flex; height: 100vh; }
+    #map { flex: 1; }
+    #panel {
+      width: 320px; background: #1a1a1a; color: #e8e8e8;
+      padding: 16px; overflow-y: auto; font-size: 13px;
+    }
+    h2 { font-size: 14px; margin-bottom: 8px; color: #f9a825; }
+    h3 { font-size: 12px; margin: 12px 0 4px; color: #aaa; text-transform: uppercase; letter-spacing: 0.05em; }
+    .coord-box {
+      background: #2a2a2a; border-radius: 6px; padding: 10px;
+      margin-bottom: 8px; cursor: pointer; border: 1px solid #333;
+      transition: border-color 0.2s;
+    }
+    .coord-box:hover { border-color: #f9a825; }
+    .coord-box.active { border-color: #f9a825; background: #332800; }
+    .coord-label { font-weight: 600; margin-bottom: 4px; }
+    .coord-val { font-family: monospace; color: #7ec8e3; font-size: 12px; }
+    .coord-empty { color: #555; font-style: italic; }
+    .hint {
+      background: #222; border-left: 3px solid #f9a825;
+      padding: 8px 10px; margin-bottom: 12px; font-size: 12px; color: #bbb;
+    }
+    button {
+      width: 100%; margin-top: 4px; padding: 6px; border-radius: 4px;
+      border: 1px solid #444; background: #2a2a2a; color: #ccc;
+      cursor: pointer; font-size: 12px;
+    }
+    button:hover { background: #383838; }
+    button.primary { background: #c0392b; color: white; border-color: #c0392b; margin-top: 12px; }
+    #output {
+      background: #111; border-radius: 6px; padding: 10px;
+      font-family: monospace; font-size: 11px; color: #7ec8e3;
+      white-space: pre-wrap; margin-top: 12px; display: none;
+    }
+    .dot { display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle; }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+<div id="panel">
+  <h2>📍 Coördinaten tool</h2>
+  <div class="hint">Klik op een vakje hieronder, klik dan op de kaart op de juiste plek. De coördinaten worden automatisch ingevuld.</div>
+
+  <h3>Balkon</h3>
+  <div class="coord-box" id="box-balkon" onclick="selectTarget('balkon','Jouw balkon','#e74c3c')">
+    <div class="coord-label"><span class="dot" style="background:#e74c3c"></span>Jouw balkon (2e verdieping)</div>
+    <div class="coord-val" id="val-balkon"><span class="coord-empty">— klik hier, dan op kaart —</span></div>
+  </div>
+
+  <h3>Gebouwen</h3>
+  <div class="coord-box" id="box-links-a" onclick="selectTarget('links-a','Links bouw — oost hoek','#e67e22')">
+    <div class="coord-label"><span class="dot" style="background:#e67e22"></span>Links (34.3m) — oost hoek</div>
+    <div class="coord-val" id="val-links-a"><span class="coord-empty">— klik hier, dan op kaart —</span></div>
+  </div>
+  <div class="coord-box" id="box-links-b" onclick="selectTarget('links-b','Links bouw — west hoek','#e67e22')">
+    <div class="coord-label"><span class="dot" style="background:#e67e22"></span>Links (34.3m) — west hoek</div>
+    <div class="coord-val" id="val-links-b"><span class="coord-empty">— klik hier, dan op kaart —</span></div>
+  </div>
+
+  <div class="coord-box" id="box-voor-a" onclick="selectTarget('voor-a','Voor/links — zuid hoek','#27ae60')">
+    <div class="coord-label"><span class="dot" style="background:#27ae60"></span>Tegenover/links (34.3m) — zuidkant</div>
+    <div class="coord-val" id="val-voor-a"><span class="coord-empty">— klik hier, dan op kaart —</span></div>
+  </div>
+  <div class="coord-box" id="box-voor-b" onclick="selectTarget('voor-b','Voor/links — noord hoek','#27ae60')">
+    <div class="coord-label"><span class="dot" style="background:#27ae60"></span>Tegenover/links (34.3m) — noordkant</div>
+    <div class="coord-val" id="val-voor-b"><span class="coord-empty">— klik hier, dan op kaart —</span></div>
+  </div>
+
+  <div class="coord-box" id="box-tussen-a" onclick="selectTarget('tussen-a','Tussengedeelte — zuidkant','#7f8c8d')">
+    <div class="coord-label"><span class="dot" style="background:#7f8c8d"></span>Tussengedeelte (10m) — zuidkant</div>
+    <div class="coord-val" id="val-tussen-a"><span class="coord-empty">— klik hier, dan op kaart —</span></div>
+  </div>
+  <div class="coord-box" id="box-tussen-b" onclick="selectTarget('tussen-b','Tussengedeelte — noordkant','#7f8c8d')">
+    <div class="coord-label"><span class="dot" style="background:#7f8c8d"></span>Tussengedeelte (10m) — noordkant</div>
+    <div class="coord-val" id="val-tussen-b"><span class="coord-empty">— klik hier, dan op kaart —</span></div>
+  </div>
+
+  <div class="coord-box" id="box-nw-a" onclick="selectTarget('nw-a','Rechtsschuin NW (37m) — zuidkant','#2980b9')">
+    <div class="coord-label"><span class="dot" style="background:#2980b9"></span>Rechtsschuin NW (37m) — zuidkant</div>
+    <div class="coord-val" id="val-nw-a"><span class="coord-empty">— klik hier, dan op kaart —</span></div>
+  </div>
+  <div class="coord-box" id="box-nw-b" onclick="selectTarget('nw-b','Rechtsschuin NW (37m) — noordkant','#2980b9')">
+    <div class="coord-label"><span class="dot" style="background:#2980b9"></span>Rechtsschuin NW (37m) — noordkant</div>
+    <div class="coord-val" id="val-nw-b"><span class="coord-empty">— klik hier, dan op kaart —</span></div>
+  </div>
+
+  <button class="primary" onclick="generateOutput()">📋 Genereer solar.js coördinaten</button>
+  <pre id="output"></pre>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Startpositie iets westelijker dan mijn vorige schatting — midden van het complex
+const map = L.map('map').setView([52.38470, 4.89150], 19);
+
+// Satelliet als primaire laag
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 21, attribution: 'Esri Satellite'
+}).addTo(map);
+
+// Straatnamen overlay
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 21, attribution: '© OSM', opacity: 0.35
+}).addTo(map);
+
+const coords = {};
+const markers = {};
+const lines = {};
+let activeTarget = null;
+
+const colors = {
+  'balkon': '#e74c3c',
+  'links-a': '#e67e22', 'links-b': '#e67e22',
+  'voor-a': '#27ae60',  'voor-b': '#27ae60',
+  'tussen-a': '#7f8c8d','tussen-b': '#7f8c8d',
+  'nw-a': '#2980b9',    'nw-b': '#2980b9',
+};
+
+function selectTarget(id, label, color) {
+  // Deactivate previous
+  document.querySelectorAll('.coord-box').forEach(b => b.classList.remove('active'));
+  document.getElementById('box-' + id).classList.add('active');
+  activeTarget = id;
+  map.getContainer().style.cursor = 'crosshair';
+}
+
+map.on('click', function(e) {
+  if (!activeTarget) return;
+  const lat = e.latlng.lat, lng = e.latlng.lng;
+  coords[activeTarget] = { lat, lng };
+
+  // Update display
+  document.getElementById('val-' + activeTarget).innerHTML =
+    lat.toFixed(8) + ', ' + lng.toFixed(8);
+  document.getElementById('box-' + activeTarget).classList.remove('active');
+
+  // Place / move marker
+  const color = colors[activeTarget];
+  if (markers[activeTarget]) map.removeLayer(markers[activeTarget]);
+  markers[activeTarget] = L.circleMarker([lat, lng], {
+    radius: activeTarget === 'balkon' ? 10 : 7,
+    color, fillColor: color, fillOpacity: 0.9, weight: 2
+  }).addTo(map).bindPopup(activeTarget + '<br>' + lat.toFixed(6) + ', ' + lng.toFixed(6));
+
+  // Draw face lines
+  const pairs = [['links-a','links-b'],['voor-a','voor-b'],['tussen-a','tussen-b'],['nw-a','nw-b']];
+  pairs.forEach(([a,b]) => {
+    if (coords[a] && coords[b]) {
+      const key = a.split('-')[0];
+      if (lines[key]) map.removeLayer(lines[key]);
+      lines[key] = L.polyline([[coords[a].lat,coords[a].lng],[coords[b].lat,coords[b].lng]],
+        { color: colors[a], weight: 5, opacity: 0.9 }).addTo(map);
+    }
+  });
+
+  activeTarget = null;
+  map.getContainer().style.cursor = '';
+});
+
+function generateOutput() {
+  const c = coords;
+  let out = '// Kopieer deze waarden naar solar.js\n\n';
+  out += 'const BALCONY = {\n';
+  out += '  lat: ' + (c['balkon'] ? c['balkon'].lat.toFixed(8) : '??') + ',\n';
+  out += '  lng: ' + (c['balkon'] ? c['balkon'].lng.toFixed(8) : '??') + ',\n';
+  out += '  heightM: 7,\n};\n\n';
+  out += 'const BUILDINGS = [\n';
+  const blds = [
+    { name:'Links (34.3m)', a:'links-a', b:'links-b', h:34.3 },
+    { name:'Voor/links (34.3m)', a:'voor-a', b:'voor-b', h:34.3 },
+    { name:'Tussengedeelte (10m)', a:'tussen-a', b:'tussen-b', h:10 },
+    { name:'Rechtsschuin NW (37m)', a:'nw-a', b:'nw-b', h:37 },
+  ];
+  blds.forEach(bl => {
+    const ca = c[bl.a], cb = c[bl.b];
+    out += '  { name:"' + bl.name + '", heightM:' + bl.h + ',\n';
+    out += '    cornerA:{lat:' + (ca ? ca.lat.toFixed(8) : '??') + ',lng:' + (ca ? ca.lng.toFixed(8) : '??') + '},\n';
+    out += '    cornerB:{lat:' + (cb ? cb.lat.toFixed(8) : '??') + ',lng:' + (cb ? cb.lng.toFixed(8) : '??') + '} },\n';
+  });
+  out += '];';
+  const el = document.getElementById('output');
+  el.style.display = 'block';
+  el.textContent = out;
+}
+</script>
+</body>
+</html>

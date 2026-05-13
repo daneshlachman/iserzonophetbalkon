@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#ffffff">
+  <title>Balkon Zon</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f7;
+      color: #1d1d1f;
+      min-height: 100dvh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: #fff;
+      border-bottom: 1px solid #e5e5e7;
+      padding: 14px 20px 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      position: relative;
+    }
+    .header-title { font-size: 15px; font-weight: 600; color: #1d1d1f; text-align: center; }
+    .refresh-btn  {
+      position: absolute; right: 16px;
+      width: 36px; height: 36px; border-radius: 50%;
+      border: none; background: #f5f5f7;
+      font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .content { padding: 16px; max-width: 480px; margin: 0 auto; }
+
+    /* ── Statuskaart ── */
+    .status-card {
+      border-radius: 20px;
+      padding: 32px 24px 28px;
+      text-align: center;
+      margin-bottom: 16px;
+      transition: background 0.5s;
+    }
+    .status-card.sun     { background: linear-gradient(145deg, #fff8e7, #ffe4a0); }
+    .status-card.partial { background: linear-gradient(145deg, #f0f4ff, #dce8ff); }
+    .status-card.shadow  { background: linear-gradient(145deg, #f0f0f3, #e4e4e9); }
+    .status-card.rain    { background: linear-gradient(145deg, #eef4fb, #d8eaf8); }
+    .status-card.night   { background: linear-gradient(145deg, #e8eaf6, #c5cae9); }
+    .status-card.loading { background: #f5f5f7; }
+
+    .status-ja-nee { font-size: 42px; font-weight: 900; letter-spacing: 0.04em; margin-bottom: 6px; }
+    .status-ja-nee.ja  { color: #2e7d32; }
+    .status-ja-nee.nee { color: #c62828; }
+    .status-emoji { font-size: 56px; line-height: 1; margin-bottom: 10px; }
+    .status-label { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+    .status-sub   { font-size: 14px; color: #555; margin-bottom: 18px; }
+
+    .status-pills {
+      display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;
+    }
+    .pill {
+      background: rgba(0,0,0,0.07); border-radius: 20px;
+      padding: 5px 12px; font-size: 13px; color: #333;
+    }
+
+    /* ── Volgende blok ── */
+    .next-card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+    .next-icon { font-size: 22px; flex-shrink: 0; }
+    .next-text { color: #555; }
+    .next-time { font-weight: 700; color: #1d1d1f; }
+
+    /* ── Tijdlijn vandaag ── */
+    .section-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+    .section-title {
+      font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
+      text-transform: uppercase; color: #86868b; margin-bottom: 14px;
+    }
+
+    /* Balk */
+    .timeline-bar {
+      display: flex; height: 10px; border-radius: 5px;
+      overflow: hidden; margin-bottom: 6px;
+    }
+    .tb-seg { flex: 1; }
+    .tb-seg.on  { background: #f9a825; }
+    .tb-seg.off { background: #e0e0e5; }
+
+    .timeline-labs {
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: #86868b; margin-bottom: 16px;
+    }
+
+    /* Periodes */
+    .periods { display: flex; flex-direction: column; gap: 0; }
+    .period {
+      display: flex; align-items: center; gap: 12px;
+      padding: 11px 0; border-bottom: 1px solid #f0f0f2;
+      font-size: 14px;
+    }
+    .period:last-child { border-bottom: none; }
+    .period-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+    .period-dot.on  { background: #f9a825; }
+    .period-dot.off { background: #c7c7cc; }
+    .period-time { font-weight: 600; min-width: 118px; color: #1d1d1f; }
+    .period-now  { font-size: 11px; color: #f9a825; font-weight: 700; margin-left: 4px; }
+    .period-label { color: #86868b; font-size: 13px; }
+
+    /* ── Zoninfo ── */
+    .info-row {
+      display: flex; gap: 10px;
+    }
+    .info-cell {
+      flex: 1; background: #fff; border-radius: 14px;
+      padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+    .info-cell-label { font-size: 11px; color: #86868b; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .info-cell-val   { font-size: 18px; font-weight: 600; }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center; font-size: 11px; color: #c7c7cc;
+      padding: 8px 0 32px;
+    }
+    #update-time { font-size: 11px; color: #c7c7cc; text-align: center; margin-top: 4px; }
+
+    /* ── Dag-selector ── */
+    .day-selector {
+      display: flex; gap: 8px; overflow-x: auto; justify-content: center; flex-wrap: wrap;
+      padding: 12px 16px 4px;
+      scrollbar-width: none;
+      background: #fff;
+      border-bottom: 1px solid #e5e5e7;
+    }
+    .day-selector::-webkit-scrollbar { display: none; }
+    .day-btn {
+      flex-shrink: 0; border: none; border-radius: 20px;
+      padding: 7px 16px; font-size: 13px; font-weight: 500;
+      cursor: pointer; background: #f0f0f5; color: #555;
+      transition: all 0.15s;
+    }
+    .day-btn.active { background: #f9a825; color: #1a0a00; font-weight: 700; }
+    .day-btn:hover:not(.active) { background: #e5e5ea; }
+
+    @media (prefers-color-scheme: dark) {
+      body { background: #1c1c1e; color: #f5f5f7; }
+      .header { background: #2c2c2e; border-color: #3a3a3c; }
+      .header-title { color: #f5f5f7; }
+      .refresh-btn { background: #3a3a3c; }
+      .status-card.shadow { background: linear-gradient(145deg, #2c2c2e, #3a3a3c); }
+      .section-card, .next-card, .info-cell { background: #2c2c2e; box-shadow: none; }
+      .period { border-color: #3a3a3c; }
+      .period-time { color: #f5f5f7; }
+      .tb-seg.off { background: #3a3a3c; }
+      .day-selector { background: #2c2c2e; border-color: #3a3a3c; }
+      .day-btn { background: #3a3a3c; color: #aaa; }
+      .day-btn:hover:not(.active) { background: #48484a; }
+      .pill { background: rgba(255,255,255,0.1); color: #e8e8e8; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">Zon op ons balkon?</div>
+  <button class="refresh-btn" onclick="loadAll()" aria-label="Vernieuwen">↻</button>
+</div>
+
+<div class="day-selector" id="daySelector"></div>
+
+<div class="content">
+
+  <!-- Status -->
+  <div class="status-card loading" id="statusCard">
+    <div class="status-ja-nee" id="statusJaNee"></div>
+    <div class="status-emoji" id="statusEmoji">⏳</div>
+    <div class="status-label" id="statusLabel">Laden…</div>
+    <div class="status-sub"   id="statusSub">&nbsp;</div>
+    <div class="status-pills" id="statusPills"></div>
+  </div>
+
+  <!-- Volgende periode -->
+  <div class="next-card" id="nextCard" style="display:none; flex-wrap:wrap; gap:8px;">
+    <div style="display:flex;align-items:center;gap:12px;width:100%;">
+      <div class="next-icon" id="nextIcon"></div>
+      <div class="next-text" id="nextText"></div>
+    </div>
+    <div id="dayInfoPills" style="display:none;gap:8px;flex-wrap:wrap;"></div>
+  </div>
+
+  <!-- Tijdlijn -->
+  <div class="section-card">
+    <div class="section-title" id="sectionTitle">Vandaag</div>
+    <div class="timeline-bar"  id="timelineBar"></div>
+    <div class="timeline-labs" id="timelineLabs"></div>
+    <div class="periods" id="periods"></div>
+  </div>
+
+  <!-- Zon-info -->
+  <div class="info-row" id="infoRow" style="display:none">
+    <div class="info-cell">
+      <div class="info-cell-label">Azimuth</div>
+      <div class="info-cell-val" id="infoAz">—</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-cell-label">Hoogte boven horizon</div>
+      <div class="info-cell-val" id="infoEl">—</div>
+    </div>
+  </div>
+
+  <div id="update-time"></div>
+  <div class="footer">Berekend op basis van zonpositie &amp; gebouwgeometrie + Open-Meteo weer</div>
+</div>
+
+<script>
+function fmt(iso) {
+  return new Date(iso).toLocaleTimeString('nl-NL', {
+    hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam'
+  });
+}
+function compassDir(deg) {
+  const d = ['N','NNO','NO','ONO','O','OZO','ZO','ZZO','Z','ZZW','ZW','WZW','W','WNW','NW','NNW'];
+  return d[Math.round(deg / 22.5) % 16];
+}
+
+let timelineData = null;
+
+function forecastQualityLabel(hourlyCloud, isoTime) {
+  if (!hourlyCloud) return null;
+  // Converteer naar Amsterdam-tijd (zelfde formaat als Open-Meteo keys)
+  const dt = new Date(isoTime);
+  const localStr = dt.toLocaleString('sv-SE', { timeZone: 'Europe/Amsterdam' }); // 'YYYY-MM-DD HH:MM:SS'
+  const key = localStr.slice(0, 13).replace(' ', 'T') + ':00'; // 'YYYY-MM-DDTHH:00'
+  const cloud = hourlyCloud[key];
+  if (cloud === undefined || cloud === null) return null;
+  const q = Math.max(0, 100 - cloud);
+  if (q >= 80) return { label: 'Volle zon', icon: '☀️', q };
+  if (q >= 55) return { label: 'Redelijk zon', icon: '🌤', q };
+  if (q >= 30) return { label: 'Matige zon', icon: '⛅', q };
+  return { label: 'Weinig zon', icon: '☁️', q };
+}
+
+
+let selectedDate = new Date();
+selectedDate.setHours(0,0,0,0);
+
+function buildDaySelector() {
+  const sel = document.getElementById('daySelector');
+  sel.innerHTML = '';
+  const days = ['zo','ma','di','wo','do','vr','za'];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + i);
+    const btn = document.createElement('button');
+    btn.className = 'day-btn' + (i === 0 ? ' active' : '');
+    const dayName = i === 0 ? 'Vandaag' : i === 1 ? 'Morgen' : days[d.getDay()] + ' ' + d.getDate() + '/' + (d.getMonth()+1);
+    btn.textContent = dayName;
+    btn.onclick = () => selectDay(d, btn);
+    sel.appendChild(btn);
+  }
+}
+
+function selectDay(date, btn) {
+  selectedDate = new Date(date);
+  document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const isToday = date.toDateString() === new Date().toDateString();
+  document.getElementById('statusCard').style.display = isToday ? '' : 'none';
+  document.getElementById('nextCard').style.display = 'none';
+  const days=['zo','ma','di','wo','do','vr','za'];
+  const isT = date.toDateString()===new Date().toDateString();
+  const titleEl = document.getElementById('sectionTitle');
+  if(titleEl) titleEl.textContent = isT ? 'Vandaag' : (date.getDate()===new Date().getDate()+1?'Morgen':days[date.getDay()]+' '+date.getDate()+'/'+(date.getMonth()+1));
+  loadTimeline();
+  if (isToday) loadNow();
+  showDayInfo(date, window._lastNow);
+}
+
+async function loadNow() {
+  try {
+    const r = await fetch('/api/now');
+    const d = await r.json();
+
+    const card = document.getElementById('statusCard');
+    const cls  = d.sunElevation < 0 ? 'night'
+               : !d.hasSun && d.weatherIcon === '🏢' ? 'shadow'
+               : !d.hasSun ? 'rain'
+               : d.partial ? 'partial'
+               : 'sun';
+    card.className = 'status-card ' + cls;
+
+    document.getElementById('statusEmoji').textContent = d.weatherIcon || (d.hasSun ? '☀️' : '🏢');
+    const jaNee = document.getElementById('statusJaNee');
+    const isNight = d.sunElevation < 0;
+    const isHalfSun = d.hasSun && d.sunQuality != null && d.sunQuality < 65;
+    jaNee.textContent  = isNight ? '' : (d.hasSun ? (isHalfSun ? 'HALF' : 'JA') : 'NEE');
+    jaNee.className    = 'status-ja-nee ' + (d.hasSun ? 'ja' : 'nee');
+    jaNee.style.fontSize = '';
+    document.getElementById('statusLabel').textContent  = d.hasSun
+      ? (d.weatherLabel || 'Zon op balkon!')
+      : (d.weatherLabel || d.reason);
+
+    const subParts = [];
+    if (d.rain  > 0.1) subParts.push(d.rain + 'mm neerslag');
+    else if (d.cloud > 50) subParts.push(d.cloud + '% bewolking');
+    if (!d.hasSun && d.blockedBy) subParts.push('Schaduw van ' + d.blockedBy.name.toLowerCase());
+    document.getElementById('statusSub').textContent = subParts.join(' · ') || ' ';
+
+    const pills = document.getElementById('statusPills');
+    pills.innerHTML = '';
+    if (d.temp) addPill(pills, d.temp);
+    if (d.uvIndex != null) addPill(pills, 'UV ' + d.uvIndex);
+    if (d.sunQuality !== null && d.sunQuality !== undefined) {
+      const sqIcon = d.sunQuality >= 80 ? '☀️' : d.sunQuality >= 50 ? '🌤' : d.sunQuality >= 25 ? '⛅' : '☁️';
+      addPill(pills, sqIcon + ' ' + d.sunQuality + '% zon');
+    }
+
+    // Info row
+    if (d.sunElevation > 0) {
+      document.getElementById('infoRow').style.display = 'flex';
+      document.getElementById('infoAz').textContent = Math.round(d.sunAzimuth) + '° ' + compassDir(d.sunAzimuth);
+      document.getElementById('infoEl').textContent = Math.round(d.sunElevation * 10) / 10 + '°';
+    }
+
+    document.getElementById('update-time').textContent =
+      'Bijgewerkt ' + new Date().toLocaleTimeString('nl-NL', { timeZone: 'Europe/Amsterdam' });
+
+    window._lastNow = d; updateNextCard(d.hasSun, d); showDayInfo(selectedDate, d);
+    return d;
+  } catch(e) { console.error(e); }
+}
+
+function addPill(container, text) {
+  const p = document.createElement('div');
+  p.className = 'pill';
+  p.textContent = text;
+  container.appendChild(p);
+}
+
+function updateNextCard(hasSunNow, nowData) {
+  if (!timelineData) return;
+  const nowIso = new Date().toISOString();
+  const tl = timelineData.timeline;
+  const nextCard = document.getElementById('nextCard');
+  const nextIcon = document.getElementById('nextIcon');
+  const nextText = document.getElementById('nextText');
+
+  // Vind de eerstvolgende overgang
+  let transition = null;
+  for (let i = 1; i < tl.length; i++) {
+    if (tl[i].time > nowIso && tl[i].hasSun !== tl[i-1].hasSun) {
+      transition = tl[i];
+      break;
+    }
+  }
+
+  if (transition) {
+    nextCard.style.display = 'flex';
+    if (transition.hasSun) {
+      const fq = forecastQualityLabel(nowData?.hourlyCloud, transition.time);
+      const pct = fq ? + fq.q + '% zon' : 'Zon';
+      const ico = fq ? fq.icon : '☀️';
+      nextIcon.textContent = ico;
+      nextText.innerHTML = '<b>' + pct + '</b> verwacht om <span class="next-time">' + fmt(transition.time) + '</span>';
+    } else {
+      nextIcon.textContent = '🏢';
+      nextText.innerHTML = 'Schaduw verwacht om <span class="next-time">' + fmt(transition.time) + '</span>';
+    }
+  } else {
+    nextCard.style.display = 'none';
+  }
+}
+
+
+function showDayInfo(date, nowData) {
+  const pills = document.getElementById('dayInfoPills');
+  const isToday = date.toDateString() === new Date().toDateString();
+  if (isToday || !nowData?.hourlyTemp) { document.getElementById('dayInfoPills').style.display='none'; return; }
+
+  // Gebruik 14:00 als representatief moment voor de dag
+  const y=date.getFullYear(), mo=String(date.getMonth()+1).padStart(2,'0'), dy=String(date.getDate()).padStart(2,'0');
+  const key14 = y+'-'+mo+'-'+dy+'T14:00';
+  const temp = nowData.hourlyTemp[key14];
+  const uv   = nowData.hourlyUV[key14];
+
+  if (temp == null && uv == null) { card.style.display = 'none'; return; }
+  pills.style.display = 'flex';
+  pills.innerHTML = '';
+  if (temp != null) { const p=document.createElement('div'); p.className='pill'; p.textContent=Math.round(temp)+'°C'; pills.appendChild(p); }
+  if (uv  != null) { const p=document.createElement('div'); p.className='pill'; p.textContent='UV '+Math.round(uv*10)/10; pills.appendChild(p); }
+}
+
+function periodLabel(w) {
+  if (!w.hasSun) return w.reason.replace('Geblokkeerd door ', 'Schaduw van ').toLowerCase().replace(/^./, c => c.toUpperCase());
+  const nowIso = new Date().toISOString();
+  if (w.start > nowIso && window._lastNow?.hourlyCloud) {
+    const fq = forecastQualityLabel(window._lastNow.hourlyCloud, w.start);
+    if (fq) return '☀ ' + fq.q + '% zon';
+  }
+  return '☀ Zon';
+}
+
+async function loadTimeline() {
+  try {
+    const y=selectedDate.getFullYear(), mo=String(selectedDate.getMonth()+1).padStart(2,'0'), dy=String(selectedDate.getDate()).padStart(2,'0'); const dateStr=y+'-'+mo+'-'+dy;
+    const r  = await fetch('/api/today?date=' + dateStr);
+    timelineData = await r.json();
+    const { timeline, sunrise, sunset, solarNoon } = timelineData;
+    if (!timeline?.length) return;
+
+    // Balk
+    const bar = document.getElementById('timelineBar');
+    bar.innerHTML = '';
+    timeline.forEach(t => {
+      const s = document.createElement('div');
+      s.className = 'tb-seg ' + (t.hasSun ? 'on' : 'off');
+      bar.appendChild(s);
+    });
+
+    document.getElementById('timelineLabs').innerHTML =
+      '<span>' + fmt(sunrise) + '</span><span>' + fmt(sunset) + '</span>';
+
+    // Periodes samenvatten
+    const windows = [];
+    let cur = null;
+    for (const t of timeline) {
+      if (!cur || cur.hasSun !== t.hasSun || (!t.hasSun && cur.reason !== t.reason)) {
+        if (cur) { cur.end = t.time; windows.push(cur); }
+        cur = { hasSun: t.hasSun, start: t.time, end: t.time, reason: t.reason };
+      } else { cur.end = t.time; }
+    }
+    if (cur) { cur.end = timeline[timeline.length-1].time; windows.push(cur); }
+
+    const nowIso = new Date().toISOString();
+    const container = document.getElementById('periods');
+    const filteredWindows = windows.filter(w => w.start !== w.end);
+    container.innerHTML = '';
+    filteredWindows.forEach(w => {
+      const isCurrent = w.start <= nowIso && nowIso < w.end;
+      const div = document.createElement('div');
+      div.className = 'period';
+      div.innerHTML = `
+        <div class="period-dot ${w.hasSun ? 'on' : 'off'}"></div>
+        <div class="period-time">
+          ${fmt(w.start)} – ${fmt(w.end)}
+          ${isCurrent ? '<span class="period-now">● nu</span>' : ''}
+        </div>
+        <div class="period-label">${periodLabel(w)}</div>
+      `;
+      container.appendChild(div);
+    });
+
+    updateNextCard(null, window._lastNow);
+  } catch(e) { console.error(e); }
+}
+
+async function loadAll() {
+  await loadNow();
+  await loadTimeline();
+}
+
+buildDaySelector();
+loadAll();
+setInterval(loadNow, 2 * 60 * 1000);
+setInterval(loadAll, 10 * 60 * 1000);
+</script>
+</body>
+</html>
