@@ -11,6 +11,26 @@ app.use(express.static(path.join(__dirname, 'public')));
 let weatherCache = null;
 let weatherCacheTime = 0;
 
+// UV-cache: maximaal 30 minuten (OpenUV gratis tier = 50 req/dag)
+let uvCache = null;
+let uvCacheTime = 0;
+const OPENUV_KEY = process.env.OPENUV_KEY || 'openuv-3deyurmp462q89-io';
+
+async function getUV() {
+  if (!OPENUV_KEY) return null;
+  if (uvCache !== null && Date.now() - uvCacheTime < 5 * 60 * 1000) return uvCache;
+  try {
+    const res  = await fetch(
+      `https://api.openuv.io/api/v1/uv?lat=${BALCONY.lat}&lng=${BALCONY.lng}&alt=${BALCONY.heightM}`,
+      { headers: { 'x-access-token': OPENUV_KEY } }
+    );
+    const data = await res.json();
+    uvCache     = data?.result?.uv ?? null;
+    uvCacheTime = Date.now();
+    return uvCache;
+  } catch { return null; }
+}
+
 async function getWeather() {
   if (weatherCache && Date.now() - weatherCacheTime < 5 * 60 * 1000) {
     return weatherCache;
@@ -34,7 +54,7 @@ async function getWeather() {
     });
 
     // Buienradar: dichtsbijzijnde meetstation → werkelijk gemeten zonkracht (W/m²)
-    let sunpower = null, stationName = null;
+    let sunpower = null, stationName = null, brTemp = null, brFeelTemp = null, brPrecip = null;
     try {
       const brRes  = await fetch('https://data.buienradar.nl/2.0/feed/json');
       const brData = await brRes.json();
@@ -43,11 +63,18 @@ async function getWeather() {
       for (const s of stations) {
         if (s.lat == null || s.lon == null) continue;
         const d = Math.hypot(s.lat - BALCONY.lat, s.lon - BALCONY.lng);
-        if (d < minDist) { minDist = d; sunpower = s.sunpower ?? null; stationName = s.stationname; }
+        if (d < minDist) {
+          minDist = d;
+          sunpower   = s.sunpower      ?? null;
+          stationName = s.stationname;
+          brTemp     = s.temperature   ?? null;
+          brFeelTemp = s.feeltemperature ?? null;
+          brPrecip   = s.precipitation ?? null;
+        }
       }
     } catch { /* Buienradar niet beschikbaar */ }
 
-    weatherCache = { ...omData, sunpower, stationName, hourlyCloud, hourlyTemp, hourlyUV };
+    weatherCache = { ...omData, sunpower, stationName, brTemp, brFeelTemp, brPrecip, hourlyCloud, hourlyTemp, hourlyUV };
     weatherCacheTime = Date.now();
     return weatherCache;
   } catch {
@@ -55,10 +82,14 @@ async function getWeather() {
   }
 }
 
-function weatherStatus(solar, weather) {
-  const temp        = weather ? Math.round(weather.temperature_2m) + '°C' : null;
-  const uvIndex     = weather?.uv_index != null ? Math.round(weather.uv_index * 10) / 10 : null;
-  const rain        = weather?.precipitation ?? 0;
+function weatherStatus(solar, weather, openUV = null) {
+  // Temperatuur: Buienradar (echte meting) heeft voorkeur boven Open-Meteo (model)
+  const rawTemp = weather?.brTemp ?? weather?.temperature_2m ?? null;
+  const temp    = rawTemp != null ? Math.round(rawTemp) + '°C' : null;
+  const feelTemp = weather?.brFeelTemp != null ? Math.round(weather.brFeelTemp) + '°C' : null;
+  // UV: Open-Meteo gecorrigeerd met gemeten zonkwaliteit
+  const rawUV   = weather?.uv_index ?? null;
+  const rain    = weather?.brPrecip ?? weather?.precipitation ?? 0;
   const sunpower    = weather?.sunpower ?? null;
   const hourlyCloud = weather?.hourlyCloud ?? {};
   const hourlyTemp  = weather?.hourlyTemp  ?? {};
@@ -74,23 +105,30 @@ function weatherStatus(solar, weather) {
     sunQuality = 0; // nacht of zon te laag
   }
 
+  // UV: OpenUV heeft voorkeur (nauwkeurig), anders Open-Meteo gecorrigeerd met zonkwaliteit
+  const uvIndex = openUV != null
+    ? Math.round(openUV * 10) / 10
+    : (rawUV != null && sunQuality != null
+        ? Math.round(rawUV * (sunQuality / 100) * 10) / 10
+        : (rawUV != null ? Math.round(rawUV * 10) / 10 : null));
+
   // Bewolking bepalen op basis van zonkwaliteit (reëel gemeten via Buienradar)
   // < 35%: te bewolkt voor zinvolle zon op het balkon → NEE
   const isHeavilyOvercast = sunQuality !== null && sunQuality < 35 && solar.sunElevation > 5;
 
   // Nacht
   if (solar.sunElevation < 0) {
-    return { ...solar, weatherIcon: '🌙', weatherLabel: 'Zon Onder', temp, rain, sunQuality, hourlyCloud, hourlyTemp, hourlyUV };
+    return { ...solar, weatherIcon: '🌙', weatherLabel: 'Zon Onder', temp, feelTemp, rain, sunQuality, hourlyCloud, hourlyTemp, hourlyUV };
   }
 
   // Regen — zon sowieso weg
   if (rain > 0.2) {
-    return { ...solar, hasSun: false, weatherIcon: '🌧', weatherLabel: 'Regen', temp, uvIndex, rain, sunQuality, hourlyCloud, hourlyTemp, hourlyUV };
+    return { ...solar, hasSun: false, weatherIcon: '🌧', weatherLabel: 'Regen', temp, feelTemp, uvIndex, rain, sunQuality, hourlyCloud, hourlyTemp, hourlyUV };
   }
 
   // Zwaar bewolkt — gaat voor gebouwschaduw (gemeten, niet voorspeld)
   if (isHeavilyOvercast) {
-    return { ...solar, hasSun: false, weatherIcon: '☁️', weatherLabel: 'Bewolkt', temp, uvIndex, rain, sunQuality, hourlyCloud, hourlyTemp, hourlyUV };
+    return { ...solar, hasSun: false, weatherIcon: '☁️', weatherLabel: 'Bewolkt', temp, feelTemp, uvIndex, rain, sunQuality, hourlyCloud, hourlyTemp, hourlyUV };
   }
 
 
@@ -98,7 +136,7 @@ function weatherStatus(solar, weather) {
   if (!solar.hasSun) {
     const isOverhang = solar.reason === 'Oversteek balkon';
     const icon = isOverhang ? '🏗' : '🏢';
-    return { ...solar, weatherIcon: icon, weatherLabel: solar.reason, temp, uvIndex, rain, sunQuality, hourlyCloud, hourlyTemp, hourlyUV };
+    return { ...solar, weatherIcon: icon, weatherLabel: solar.reason, temp, feelTemp, uvIndex, rain, sunQuality, hourlyCloud, hourlyTemp, hourlyUV };
   }
 
   // Oversteek: percentage van balkondvloer in direct zonlicht
@@ -108,12 +146,12 @@ function weatherStatus(solar, weather) {
 
   // Geometrisch zon — nuanceer op gemeten zonkwaliteit
   if (sunQuality !== null && sunQuality < 65) {
-    return { ...solar, hasSun: true, partial: true, weatherIcon: '⛅', weatherLabel: 'Wisselend bewolkt', temp, uvIndex, rain, sunQuality, overhangPct, hourlyCloud, hourlyTemp, hourlyUV };
+    return { ...solar, hasSun: true, partial: true, weatherIcon: '⛅', weatherLabel: 'Wisselend bewolkt', temp, feelTemp, uvIndex, rain, sunQuality, overhangPct, hourlyCloud, hourlyTemp, hourlyUV };
   }
   if (sunQuality !== null && sunQuality < 85) {
-    return { ...solar, hasSun: true, partial: true, weatherIcon: '🌤', weatherLabel: 'Zon op balkon!', temp, uvIndex, rain, sunQuality, overhangPct, hourlyCloud, hourlyTemp, hourlyUV };
+    return { ...solar, hasSun: true, partial: true, weatherIcon: '🌤', weatherLabel: 'Zon op balkon!', temp, feelTemp, uvIndex, rain, sunQuality, overhangPct, hourlyCloud, hourlyTemp, hourlyUV };
   }
-  return { ...solar, hasSun: true, weatherIcon: '☀️', weatherLabel: 'Zon op balkon!', temp, uvIndex, rain, sunQuality, overhangPct, hourlyCloud, hourlyTemp, hourlyUV };
+  return { ...solar, hasSun: true, weatherIcon: '☀️', weatherLabel: 'Zon op balkon!', temp, feelTemp, uvIndex, rain, sunQuality, overhangPct, hourlyCloud, hourlyTemp, hourlyUV };
 }
 
 function weatherIcon(code, isDay) {
@@ -129,8 +167,8 @@ function weatherIcon(code, isDay) {
 
 app.get('/api/now', async (req, res) => {
   const solar   = checkSun(new Date());
-  const weather = await getWeather();
-  res.json(weatherStatus(solar, weather));
+  const [weather, openUV] = await Promise.all([getWeather(), getUV()]);
+  res.json(weatherStatus(solar, weather, openUV));
 });
 
 app.get('/api/today', (req, res) => {
